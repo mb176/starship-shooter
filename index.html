@@ -43,6 +43,38 @@
             pointer-events: none;
         }
         
+        #healthBar {
+            width: 150px;
+            height: 20px;
+            background: #333;
+            border: 2px solid #0f0;
+            margin-top: 5px;
+            position: relative;
+            box-shadow: 0 0 10px #0f0;
+        }
+        
+        #healthBarFill {
+            height: 100%;
+            background: linear-gradient(to right, #0f0, #0a0);
+            transition: width 0.3s ease;
+            box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+        
+        #healthBar.low #healthBarFill {
+            background: linear-gradient(to right, #f00, #a00);
+            box-shadow: inset 0 0 10px rgba(255, 0, 0, 0.5);
+        }
+        
+        #healthBar.critical #healthBarFill {
+            background: linear-gradient(to right, #f00, #800);
+            animation: pulse 0.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
         #menu {
             position: absolute;
             top: 50%;
@@ -80,6 +112,23 @@
             transform: scale(1.1);
         }
         
+        #menu button.selected {
+            background: #0ff;
+            box-shadow: 0 0 20px #0ff;
+        }
+        
+        .difficulty-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .difficulty-buttons button {
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        
         .hidden {
             display: none !important;
         }
@@ -104,7 +153,10 @@
         <div id="ui">
             <div>
                 <div>Score: <span id="score">0</span></div>
-                <div>Health: <span id="health">5</span></div>
+                <div style="margin-top: 5px;">Health:</div>
+                <div id="healthBar">
+                    <div id="healthBarFill" style="width: 100%"></div>
+                </div>
             </div>
             <div>
                 <div>Level: <span id="level">1</span></div>
@@ -117,6 +169,14 @@
         <div id="menu">
             <h1>STARSHIP SHOOTER</h1>
             <div id="menuContent">
+                <div style="margin-bottom: 20px;">
+                    <p style="color: #0f0; margin-bottom: 10px;">SELECT DIFFICULTY:</p>
+                    <div class="difficulty-buttons">
+                        <button id="easyBtn" onclick="game.setDifficulty('easy')">EASY</button>
+                        <button id="normalBtn" class="selected" onclick="game.setDifficulty('normal')">NORMAL</button>
+                        <button id="hardBtn" onclick="game.setDifficulty('hard')">HARD</button>
+                    </div>
+                </div>
                 <button onclick="game.startGame()">START GAME</button>
                 <button onclick="game.showInstructions()">HOW TO PLAY</button>
                 <button onclick="game.toggleSound()">SOUND: <span id="soundStatus">ON</span></button>
@@ -127,6 +187,10 @@
                 <p style="margin-bottom: 10px;">SPACE - Shoot</p>
                 <p style="margin-bottom: 10px;">P or ESC - Pause</p>
                 <p style="margin-bottom: 20px;">Destroy enemies, collect power-ups, survive!</p>
+                <p style="margin-bottom: 10px; color: #0f0;">Difficulties:</p>
+                <p style="margin-bottom: 5px; font-size: 14px;">Easy: 7 HP, fewer enemies</p>
+                <p style="margin-bottom: 5px; font-size: 14px;">Normal: 5 HP, balanced</p>
+                <p style="margin-bottom: 5px; font-size: 14px;">Hard: 3 HP, more enemies</p>
                 <button onclick="game.hideInstructions()">BACK</button>
             </div>
             <div id="gameOver" class="hidden">
@@ -165,6 +229,24 @@
                 this.waveEnemies = 10;
                 this.stars = [];
                 this.highScore = localStorage.getItem('highScore') || 0;
+                this.difficulty = 'normal';
+                this.difficultySettings = {
+                    easy: {
+                        health: 7,
+                        spawnDelay: 700,
+                        enemiesPerWave: 8
+                    },
+                    normal: {
+                        health: 5,
+                        spawnDelay: 500,
+                        enemiesPerWave: 10
+                    },
+                    hard: {
+                        health: 3,
+                        spawnDelay: 300,
+                        enemiesPerWave: 15
+                    }
+                };
                 
                 this.setupControls();
                 this.createStars();
@@ -200,18 +282,31 @@
                 });
             }
             
+            setDifficulty(difficulty) {
+                this.difficulty = difficulty;
+                
+                // Update button styles
+                document.getElementById('easyBtn').classList.remove('selected');
+                document.getElementById('normalBtn').classList.remove('selected');
+                document.getElementById('hardBtn').classList.remove('selected');
+                document.getElementById(difficulty + 'Btn').classList.add('selected');
+            }
+            
             startGame() {
+                const settings = this.difficultySettings[this.difficulty];
+                
                 this.score = 0;
                 this.level = 1;
                 this.wave = 1;
-                this.health = this.maxHealth;
+                this.health = settings.health;
+                this.maxHealth = settings.health;
                 this.enemies = [];
                 this.bullets = [];
                 this.enemyBullets = [];
                 this.powerups = [];
                 this.particles = [];
                 this.enemiesKilled = 0;
-                this.waveEnemies = 10;
+                this.waveEnemies = settings.enemiesPerWave;
                 this.activePowerup = null;
                 this.powerupTimer = 0;
                 
@@ -224,6 +319,7 @@
             }
             
             spawnWave() {
+                const settings = this.difficultySettings[this.difficulty];
                 const enemyCount = this.waveEnemies + (this.level - 1) * 5;
                 const types = ['basic', 'fast', 'heavy'];
                 
@@ -235,7 +331,7 @@
                         }
                         const x = Math.random() * (canvas.width - 40) + 20;
                         this.enemies.push(new Enemy(x, -30, type, this.level));
-                    }, i * 500);
+                    }, i * settings.spawnDelay);
                 }
             }
             
@@ -253,9 +349,10 @@
             }
             
             nextLevel() {
+                const settings = this.difficultySettings[this.difficulty];
                 this.level++;
                 this.wave = 1;
-                this.waveEnemies += 5;
+                this.waveEnemies = settings.enemiesPerWave + (this.level - 1) * 3;
                 this.spawnWave();
             }
             
@@ -317,6 +414,11 @@
             
             update() {
                 if (this.gameState !== 'playing') return;
+                
+                // Update screen flash
+                if (this.screenFlash > 0) {
+                    this.screenFlash--;
+                }
                 
                 // Update stars
                 this.stars.forEach(star => {
@@ -405,7 +507,7 @@
                 
                 // Enemy bullet vs Player
                 this.enemyBullets.forEach(bullet => {
-                    if (this.collision(bullet, this.player) && !this.player.invincible) {
+                    if (this.collision(bullet, this.player) && !this.player.invincible && !this.player.damageInvulnerable) {
                         bullet.y = canvas.height + 100;
                         this.takeDamage();
                     }
@@ -413,7 +515,7 @@
                 
                 // Enemy vs Player
                 this.enemies.forEach(enemy => {
-                    if (this.collision(enemy, this.player) && !this.player.invincible) {
+                    if (this.collision(enemy, this.player) && !this.player.invincible && !this.player.damageInvulnerable) {
                         enemy.health = 0;
                         enemy.dead = true;
                         this.takeDamage();
@@ -439,9 +541,25 @@
             
             takeDamage() {
                 this.health--;
+                
+                // Create explosion at player position
+                this.createPlayerExplosion(this.player.x + this.player.width / 2, this.player.y + this.player.height / 2);
+                
+                // Screen flash effect
+                this.screenFlash = 10;
+                
+                // Brief invulnerability
+                this.player.damageInvulnerable = 30;
+                
                 this.updateUI();
                 if (this.health <= 0) {
                     this.gameOver();
+                }
+            }
+            
+            createPlayerExplosion(x, y) {
+                for (let i = 0; i < 20; i++) {
+                    this.particles.push(new Particle(x, y, true));
                 }
             }
             
@@ -489,9 +607,26 @@
             
             updateUI() {
                 document.getElementById('score').textContent = this.score;
-                document.getElementById('health').textContent = this.health;
                 document.getElementById('level').textContent = this.level;
                 document.getElementById('wave').textContent = this.wave;
+                
+                // Update health bar
+                const healthPercent = (this.health / this.maxHealth) * 100;
+                const healthBarFill = document.getElementById('healthBarFill');
+                const healthBar = document.getElementById('healthBar');
+                
+                healthBarFill.style.width = healthPercent + '%';
+                
+                // Change color based on health level
+                if (healthPercent <= 20) {
+                    healthBar.classList.add('critical');
+                    healthBar.classList.remove('low');
+                } else if (healthPercent <= 40) {
+                    healthBar.classList.add('low');
+                    healthBar.classList.remove('critical');
+                } else {
+                    healthBar.classList.remove('low', 'critical');
+                }
             }
             
             draw() {
@@ -511,6 +646,12 @@
                     this.enemies.forEach(e => e.draw());
                     this.powerups.forEach(p => p.draw());
                     this.particles.forEach(p => p.draw());
+                    
+                    // Screen flash effect when hit
+                    if (this.screenFlash > 0) {
+                        ctx.fillStyle = `rgba(255, 0, 0, ${this.screenFlash / 30})`;
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    }
                     
                     if (this.gameState === 'paused') {
                         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -541,6 +682,7 @@
                 this.fireRate = 15;
                 this.fireCooldown = 0;
                 this.invincible = false;
+                this.damageInvulnerable = 0;
                 this.multishot = false;
                 this.scoreMultiplier = 1;
             }
@@ -568,9 +710,15 @@
                 }
                 
                 if (this.fireCooldown > 0) this.fireCooldown--;
+                if (this.damageInvulnerable > 0) this.damageInvulnerable--;
             }
             
             draw() {
+                // Blink effect when recently damaged
+                if (this.damageInvulnerable > 0 && Math.floor(this.damageInvulnerable / 5) % 2 === 0) {
+                    return; // Skip drawing to create blink effect
+                }
+                
                 if (this.invincible) {
                     ctx.strokeStyle = '#0ff';
                     ctx.lineWidth = 3;
@@ -658,15 +806,143 @@
             }
             
             draw() {
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
+                const centerX = this.x + this.width / 2;
+                const centerY = this.y + this.height / 2;
                 
-                if (this.type === 'boss') {
-                    ctx.fillStyle = '#fff';
-                    ctx.fillRect(this.x + 10, this.y + 10, this.width - 20, 5);
+                if (this.type === 'basic') {
+                    // UFO/Flying Saucer design
+                    // Main body (ellipse)
+                    ctx.fillStyle = '#c00';
+                    ctx.beginPath();
+                    ctx.ellipse(centerX, centerY, this.width / 2, this.height / 3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Dome/cockpit
+                    ctx.fillStyle = '#f44';
+                    ctx.beginPath();
+                    ctx.ellipse(centerX, centerY - 5, this.width / 3, this.height / 4, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Window
+                    ctx.fillStyle = '#0ff';
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY - 5, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Bottom lights (animated)
+                    const pulse = Math.sin(Date.now() / 200) * 0.3 + 0.7;
+                    ctx.fillStyle = `rgba(255, 255, 0, ${pulse})`;
+                    ctx.beginPath();
+                    ctx.arc(centerX - 8, centerY + 5, 2, 0, Math.PI * 2);
+                    ctx.arc(centerX + 8, centerY + 5, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                } else if (this.type === 'fast') {
+                    // Sleek fighter design
+                    // Main body (arrow shape)
+                    ctx.fillStyle = '#dd0';
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, this.y);  // Nose
+                    ctx.lineTo(centerX - this.width / 2, this.y + this.height);  // Left wing
+                    ctx.lineTo(centerX, this.y + this.height - 5);  // Center back
+                    ctx.lineTo(centerX + this.width / 2, this.y + this.height);  // Right wing
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Cockpit
+                    ctx.fillStyle = '#880';
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, this.y + 3);
+                    ctx.lineTo(centerX - 4, this.y + 10);
+                    ctx.lineTo(centerX + 4, this.y + 10);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Engine glow
+                    const glow = Math.sin(Date.now() / 100) * 0.4 + 0.6;
+                    ctx.fillStyle = `rgba(255, 100, 0, ${glow})`;
+                    ctx.beginPath();
+                    ctx.arc(centerX, this.y + this.height - 3, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                } else if (this.type === 'heavy') {
+                    // Armored cruiser design
+                    // Main hull
+                    ctx.fillStyle = '#808';
+                    ctx.fillRect(this.x + 5, this.y, this.width - 10, this.height);
+                    
+                    // Side armor plates
+                    ctx.fillStyle = '#a0a';
+                    ctx.fillRect(this.x, this.y + 8, 5, this.height - 16);
+                    ctx.fillRect(this.x + this.width - 5, this.y + 8, 5, this.height - 16);
+                    
+                    // Bridge/command section
+                    ctx.fillStyle = '#606';
+                    ctx.fillRect(this.x + 10, this.y + 5, this.width - 20, 8);
+                    
+                    // Weapon ports
                     ctx.fillStyle = '#f00';
+                    ctx.fillRect(this.x + 8, this.y + this.height - 5, 4, 5);
+                    ctx.fillRect(this.x + this.width - 12, this.y + this.height - 5, 4, 5);
+                    
+                    // Engine vents
+                    const enginePulse = Math.sin(Date.now() / 150) * 0.3 + 0.7;
+                    ctx.fillStyle = `rgba(0, 255, 255, ${enginePulse})`;
+                    ctx.fillRect(this.x + 12, this.y + this.height - 3, 3, 3);
+                    ctx.fillRect(this.x + this.width - 15, this.y + this.height - 3, 3, 3);
+                    
+                } else if (this.type === 'boss') {
+                    // Large battleship design
+                    // Main hull (hexagonal)
+                    ctx.fillStyle = '#f60';
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, this.y);
+                    ctx.lineTo(centerX + this.width / 3, this.y + 10);
+                    ctx.lineTo(centerX + this.width / 3, this.y + this.height - 10);
+                    ctx.lineTo(centerX, this.y + this.height);
+                    ctx.lineTo(centerX - this.width / 3, this.y + this.height - 10);
+                    ctx.lineTo(centerX - this.width / 3, this.y + 10);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Wings/armor
+                    ctx.fillStyle = '#c40';
+                    ctx.fillRect(this.x, this.y + 20, 10, 20);
+                    ctx.fillRect(this.x + this.width - 10, this.y + 20, 10, 20);
+                    
+                    // Command bridge
+                    ctx.fillStyle = '#820';
+                    ctx.fillRect(centerX - 15, this.y + 15, 30, 12);
+                    
+                    // Windows/lights
+                    ctx.fillStyle = '#0ff';
+                    for (let i = 0; i < 5; i++) {
+                        ctx.fillRect(centerX - 10 + i * 5, this.y + 19, 2, 4);
+                    }
+                    
+                    // Weapon turrets
+                    ctx.fillStyle = '#600';
+                    ctx.beginPath();
+                    ctx.arc(this.x + 5, centerY, 6, 0, Math.PI * 2);
+                    ctx.arc(this.x + this.width - 5, centerY, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Engine cores
+                    const bossPulse = Math.sin(Date.now() / 100) * 0.5 + 0.5;
+                    ctx.fillStyle = `rgba(255, 0, 0, ${bossPulse})`;
+                    ctx.beginPath();
+                    ctx.arc(centerX - 10, this.y + this.height - 5, 4, 0, Math.PI * 2);
+                    ctx.arc(centerX + 10, this.y + this.height - 5, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Health bar
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(this.x + 5, this.y + 5, this.width - 10, 5);
+                    ctx.fillStyle = '#0f0';
                     const healthPercent = this.health / (30 + game.level * 10);
-                    ctx.fillRect(this.x + 10, this.y + 10, (this.width - 20) * healthPercent, 5);
+                    ctx.fillRect(this.x + 5, this.y + 5, (this.width - 10) * healthPercent, 5);
+                    ctx.strokeStyle = '#fff';
+                    ctx.strokeRect(this.x + 5, this.y + 5, this.width - 10, 5);
                 }
             }
         }
@@ -728,7 +1004,7 @@
         }
         
         class Particle {
-            constructor(x, y) {
+            constructor(x, y, isPlayer = false) {
                 this.x = x;
                 this.y = y;
                 this.vx = (Math.random() - 0.5) * 6;
@@ -736,6 +1012,7 @@
                 this.life = 30;
                 this.maxLife = 30;
                 this.size = Math.random() * 4 + 2;
+                this.isPlayer = isPlayer;
             }
             
             update() {
@@ -745,7 +1022,15 @@
             }
             
             draw() {
-                ctx.fillStyle = `rgba(255, ${100 + this.life * 5}, 0, ${this.life / this.maxLife})`;
+                if (this.isPlayer) {
+                    // White/cyan particles for player damage
+                    const alpha = this.life / this.maxLife;
+                    const brightness = 150 + this.life * 3;
+                    ctx.fillStyle = `rgba(${brightness}, 255, 255, ${alpha})`;
+                } else {
+                    // Orange/red particles for enemy explosions
+                    ctx.fillStyle = `rgba(255, ${100 + this.life * 5}, 0, ${this.life / this.maxLife})`;
+                }
                 ctx.fillRect(this.x, this.y, this.size, this.size);
             }
         }
